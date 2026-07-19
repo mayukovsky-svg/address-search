@@ -328,22 +328,23 @@ function getTokens(raw) {
     .filter(Boolean);
 }
 
-// 住所1件に対して、全トークンがいずれかのパーツの「読みの先頭」にヒットするか判定
-// （視認性・速度を優先し、部分一致は行わない）
-// 1つのパーツを複数のトークンで使い回さない（例:「１０」「１０」が両方とも
-// 同じ「十条」に一致してしまい「十丁目」が無視される、という事態を避けるため）
+// 住所1件に対して、全トークンが「住所の並び順どおりに」いずれかのパーツの
+// 「読みの先頭」にヒットするか判定（視認性・速度を優先し、部分一致は行わない）。
+// 各トークンは直前のトークンが一致したパーツより後ろからしか探さないため、
+// パーツの使い回しも、住所の並びを無視した前後逆転した一致も起きない
+// （例:「よ」→横浜市の後に「な」→中里 に一致したら、それより前にある
+// 　「南区」にはもう「み」が一致できない、というのが正しい挙動）
 function matchAddress(addr, tokens) {
-  const usedIndices = new Set();
   const tokenHits = [];
+  let searchFrom = 0;
   for (const token of tokens) {
     const tokenYomi = toHiragana(token);
     let partIndex = -1;
-    for (let i = 0; i < addr.parts.length; i++) {
-      if (usedIndices.has(i)) continue;
+    for (let i = searchFrom; i < addr.parts.length; i++) {
       if (addr.parts[i].yomi.startsWith(tokenYomi)) { partIndex = i; break; }
     }
     if (partIndex === -1) return null; // このトークンがどこにもヒットしなければ住所全体を除外
-    usedIndices.add(partIndex);
+    searchFrom = partIndex + 1;
     tokenHits.push({ token, partIndex });
   }
   return tokenHits;
