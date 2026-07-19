@@ -220,7 +220,7 @@
   <div class="field">
     <label for="prefKanaInput">都道府県（読み1文字で絞り込み）</label>
     <div class="pref-row">
-      <input type="text" id="prefKanaInput" class="pref-kana-input" maxlength="1" placeholder="か" autocomplete="off">
+      <input type="text" id="prefKanaInput" class="pref-kana-input" maxlength="1" autocomplete="off">
       <select id="prefSelect"></select>
     </div>
   </div>
@@ -312,8 +312,6 @@ function buildPrefOptions(filterChar) {
     prefSelect.dispatchEvent(new Event("change"));
   }
 }
-buildPrefOptions("");
-
 prefKanaInput.addEventListener("input", () => {
   const raw = prefKanaInput.value.trim();
   const filterChar = raw ? toHiragana(raw.charAt(0)) : "";
@@ -552,13 +550,18 @@ resultsEl.addEventListener("click", (e) => {
 });
 
 // ---- イベント ---------------------------------------------------------
-prefSelect.addEventListener("change", () => {
+prefSelect.addEventListener("change", (e) => {
   const code = prefSelect.value;
   keywordInput.disabled = true;
   keywordInput.value = "";
   currentAddresses = [];
 
   if (!code) {
+    // e.isTrusted: ユーザーが手動で「-- 選択してください --」を選んだ場合のみテキストボックスも空にする。
+    // buildPrefOptions()からの自動発火（絞り込みで該当なしになった等）では入力中の文字を消さない。
+    if (e.isTrusted) {
+      prefKanaInput.value = "";
+    }
     inputHint.textContent = "先に都道府県を選択してください";
     render();
     return;
@@ -589,6 +592,11 @@ keywordInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(render, 120);
 });
+
+// 初期表示は「ほ」→北海道をデフォルト選択にする（プルダウンの未選択肢は残したまま）
+// change イベントリスナーの登録後に呼ぶ必要があるため、ここで実行する
+prefKanaInput.value = "ほ";
+buildPrefOptions("ほ");
 
 render();
 </script>
