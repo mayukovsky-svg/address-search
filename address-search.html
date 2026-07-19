@@ -561,6 +561,7 @@ prefSelect.addEventListener("change", (e) => {
     // buildPrefOptions()からの自動発火（絞り込みで該当なしになった等）では入力中の文字を消さない。
     if (e.isTrusted) {
       prefKanaInput.value = "";
+      buildPrefOptions(""); // 絞り込みで狭まっていたプルダウンを47都道府県フルリストに戻す
     }
     inputHint.textContent = "先に都道府県を選択してください";
     render();
