@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>住所検索システム</title>
+<style>
+  :root {
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --prefix-bg: #fde68a;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --bg: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .app {
+    max-width: 640px;
+    margin: 0 auto;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 20px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: #374151;
+  }
+  .field {
+    margin-bottom: 16px;
+  }
+  .pref-row {
+    display: flex;
+    gap: 8px;
+  }
+  .pref-kana-input {
+    flex: 0 0 56px;
+    width: 56px;
+    text-align: center;
+    font-size: 15px;
+  }
+  .pref-row select {
+    flex: 1;
+    min-width: 0;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 15px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--text);
+  }
+  select:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  input[type="text"]:disabled, select + .hint {
+    background: #f1f5f9;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .legend {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    margin: -4px 0 16px;
+  }
+  .legend span.swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+  .swatch.prefix { background: var(--prefix-bg); }
+
+  #resultCount {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 8px;
+  }
+  ul#results {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  li.result {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    transition: background 0.15s;
+  }
+  li.result:hover {
+    background: #f8fafc;
+  }
+  .addr-line {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .addr-line .part {
+    padding: 1px 2px;
+    border-radius: 3px;
+  }
+  .addr-line .part.hit { background: var(--prefix-bg); }
+  .yomi-line {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .zip-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .zip-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+  }
+  .copy-btn {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    color: var(--accent);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .copy-btn:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+  }
+  .copy-btn.copied {
+    background: #dcfce7;
+    border-color: #16a34a;
+    color: #16a34a;
+  }
+  .copy-btn.failed {
+    background: #fee2e2;
+    border-color: #dc2626;
+    color: #dc2626;
+  }
+  .badges {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .empty {
+    font-size: 13px;
+    color: var(--muted);
+    padding: 16px 4px;
+    text-align: center;
+  }
+  .zip-value.muted {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .credit {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 16px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .credit a {
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>住所検索システム</h1>
+  <p class="sub">都道府県を選び、キーワードをスペース区切りで入力すると、読みがなの頭文字一致で候補が絞り込まれます（全国47都道府県対応）。</p>
+
+  <div class="field">
+    <label for="prefKanaInput">都道府県（読み1文字で絞り込み）</label>
+    <div class="pref-row">
+      <input type="text" id="prefKanaInput" class="pref-kana-input" maxlength="1" placeholder="か" autocomplete="off">
+      <select id="prefSelect"></select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="keywordInput">キーワード（スペース区切りで複数入力可）</label>
+    <input type="text" id="keywordInput" placeholder="例: よ に み" autocomplete="off" disabled>
+    <div class="hint" id="inputHint">先に都道府県を選択してください</div>
+  </div>
+
+  <div class="legend">
+    <div><span class="swatch prefix"></span>読みの先頭一致</div>
+  </div>
+
+  <div id="resultCount"></div>
+  <ul id="results"></ul>
+
+  <p class="credit">住所データ: <a href="https://github.com/geolonia/japanese-addresses" target="_blank" rel="noopener">Geolonia 住所データ</a>（CC BY 4.0）／ 郵便番号データ: 日本郵便株式会社</p>
+</div>
+
+<script>
+// ---- 都道府県リスト（47都道府県、JIS都道府県コード順） -------------------
+// 対応する住所データは data/{2桁コード}.js に分割配置してあり、選択時に読み込む
+const prefectures = [
+  "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
+  "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+  "新潟県","富山県","石川県","福井県","山梨県","長野県",
+  "岐阜県","静岡県","愛知県","三重県",
+  "滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県",
+  "鳥取県","島根県","岡山県","広島県","山口県",
+  "徳島県","香川県","愛媛県","高知県",
+  "福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"
+];
+// prefectures と同じ並び順の読みがな（都道府県セレクトの絞り込みに使用）
+const prefectureYomi = [
+  "ほっかいどう","あおもりけん","いわてけん","みやぎけん","あきたけん","やまがたけん","ふくしまけん",
+  "いばらきけん","とちぎけん","ぐんまけん","さいたまけん","ちばけん","とうきょうと","かながわけん",
+  "にいがたけん","とやまけん","いしかわけん","ふくいけん","やまなしけん","ながのけん",
+  "ぎふけん","しずおかけん","あいちけん","みえけん",
+  "しがけん","きょうとふ","おおさかふ","ひょうごけん","ならけん","わかやまけん",
+  "とっとりけん","しまねけん","おかやまけん","ひろしまけん","やまぐちけん",
+  "とくしまけん","かがわけん","えひめけん","こうちけん",
+  "ふくおかけん","さがけん","ながさきけん","くまもとけん","おおいたけん","みやざきけん","かごしまけん","おきなわけん"
+];
+
+// ---- DOM ----------------------------------------------------------------
+const prefKanaInput = document.getElementById("prefKanaInput");
+const prefSelect = document.getElementById("prefSelect");
+const keywordInput = document.getElementById("keywordInput");
+const inputHint = document.getElementById("inputHint");
+const resultsEl = document.getElementById("results");
+const resultCountEl = document.getElementById("resultCount");
+
+// ---- ユーティリティ -------------------------------------------------------
+// カタカナをひらがなに変換（読みがな同士の比較専用）
+function toHiragana(str) {
+  return str.replace(/[ァ-ヶ]/g, ch =>
+    String.fromCharCode(ch.charCodeAt(0) - 0x60)
+  );
+}
+
+// 都道府県セレクトを構築（valueはJISコード = data/xx.js のファイル名）
+// filterChar が指定された場合は、読みがながその文字で始まる都道府県だけに絞り込む
+function buildPrefOptions(filterChar) {
+  const prevValue = prefSelect.value;
+  prefSelect.innerHTML = "";
+
+  const placeholderOpt = document.createElement("option");
+  placeholderOpt.value = "";
+  placeholderOpt.textContent = "-- 選択してください --";
+  prefSelect.appendChild(placeholderOpt);
+
+  prefectures.forEach((p, i) => {
+    if (filterChar && !prefectureYomi[i].startsWith(filterChar)) return;
+    const opt = document.createElement("option");
+    opt.value = String(i + 1).padStart(2, "0");
+    opt.textContent = p;
+    prefSelect.appendChild(opt);
+  });
+
+  const realOptions = Array.from(prefSelect.options).filter(o => o.value !== "");
+  const stillValid = prevValue !== "" && realOptions.some(o => o.value === prevValue);
+  prefSelect.value = stillValid ? prevValue : (realOptions[0] ? realOptions[0].value : "");
+
+  if (prefSelect.value !== prevValue) {
+    prefSelect.dispatchEvent(new Event("change"));
+  }
+}
+buildPrefOptions("");
+
+prefKanaInput.addEventListener("input", () => {
+  const raw = prefKanaInput.value.trim();
+  const filterChar = raw ? toHiragana(raw.charAt(0)) : "";
+  buildPrefOptions(filterChar);
+});
+// 全角スペースを半角にしてトークン分割
+function getTokens(raw) {
+  return raw
+    .replace(/　/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+// 住所1件に対して、全トークンがいずれかのパーツの「読みの先頭」にヒットするか判定
+// （視認性・速度を優先し、部分一致は行わない）
+function matchAddress(addr, tokens) {
+  const tokenHits = [];
+  for (const token of tokens) {
+    const tokenYomi = toHiragana(token);
+    let partIndex = -1;
+    for (let i = 0; i < addr.parts.length; i++) {
+      if (addr.parts[i].yomi.startsWith(tokenYomi)) { partIndex = i; break; }
+    }
+    if (partIndex === -1) return null; // このトークンがどこにもヒットしなければ住所全体を除外
+    tokenHits.push({ token, partIndex });
+  }
+  return tokenHits;
+}
+
+// ---- 都道府県データの遅延読み込み -----------------------------------------
+// data/{コード}.js は window.__ADDR_DATA[コード] = { pref, prefYomi, cities:[{k,y,towns:[{k,y,z}]}] } をセットする
+const addressCache = {};   // コード -> フラット化済み住所配列（一度読み込んだら再利用）
+let currentAddresses = []; // 現在選択中の都道府県の住所配列
+let loadToken = 0;         // 都道府県切り替え時に古い読み込みの結果を捨てるためのトークン
+
+function flattenPrefData(raw) {
+  const list = [];
+  for (const city of raw.cities) {
+    const cityPart = { kanji: city.k, yomi: city.y };
+    if (city.wards) {
+      // 政令指定都市: 市パーツ＋区パーツ＋町名パーツの3段構成
+      for (const ward of city.wards) {
+        const wardPart = { kanji: ward.k, yomi: ward.y };
+        for (const town of ward.towns) {
+          list.push({
+            pref: raw.pref,
+            yomiPref: raw.prefYomi,
+            zip: town.z,
+            parts: [cityPart, wardPart, { kanji: town.k, yomi: town.y }]
+          });
+        }
+      }
+    } else {
+      for (const town of city.towns) {
+        list.push({
+          pref: raw.pref,
+          yomiPref: raw.prefYomi,
+          zip: town.z, // 郵便番号データと一致しなかった場合は null
+          parts: [cityPart, { kanji: town.k, yomi: town.y }]
+        });
+      }
+    }
+  }
+  return list;
+}
+
+function loadPrefData(code) {
+  if (addressCache[code]) return Promise.resolve(addressCache[code]);
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = `data/${code}.js`;
+    script.onload = () => {
+      if (window.__ADDR_DATA && window.__ADDR_DATA[code]) {
+        addressCache[code] = flattenPrefData(window.__ADDR_DATA[code]);
+        resolve(addressCache[code]);
+      } else {
+        reject(new Error("データの形式が不正です"));
+      }
+    };
+    script.onerror = () => reject(new Error("データファイルを読み込めませんでした（dataフォルダの配置を確認してください）"));
+    document.head.appendChild(script);
+  });
+}
+
+function search(keyword) {
+  const tokens = getTokens(keyword);
+  if (tokens.length === 0) return null; // 未入力
+  const results = [];
+  for (const addr of currentAddresses) {
+    const hits = matchAddress(addr, tokens);
+    if (hits) results.push({ addr, hits });
+  }
+  return results;
+}
+
+function formatZip(zip7) {
+  return zip7.slice(0, 3) + "-" + zip7.slice(3);
+}
+
+// ---- 描画 ------------------------------------------------------------
+function renderAddressLine(addr, hits) {
+  const partsHtml = addr.parts.map((part, i) => {
+    const hit = hits.find(h => h.partIndex === i);
+    if (hit) {
+      return `<span class="part hit">${part.kanji}</span>`;
+    }
+    return `<span class="part">${part.kanji}</span>`;
+  }).join("");
+  return `<span class="part">${addr.pref}</span>${partsHtml}`;
+}
+
+function renderBadges(addr, hits) {
+  if (hits.length === 0) return "";
+  const items = hits.map(h => {
+    const partKanji = addr.parts[h.partIndex].kanji;
+    return `<span class="badge">「${h.token}」→ ${partKanji}</span>`;
+  }).join("");
+  return `<div class="badges">${items}</div>`;
+}
+
+const MAX_RESULTS = 50;
+
+function renderZip(addr) {
+  if (!addr.zip) {
+    return `<span class="zip-value muted">郵便番号: 不明</span>`;
+  }
+  const formatted = formatZip(addr.zip);
+  return `<span class="zip-value">〒${formatted}</span>` +
+         `<button type="button" class="copy-btn" data-zip="${formatted}">コピー</button>`;
+}
+
+function render() {
+  resultsEl.innerHTML = "";
+
+  if (!prefSelect.value) {
+    resultCountEl.textContent = "";
+    resultsEl.innerHTML = `<li class="empty">都道府県を選択すると検索できます</li>`;
+    return;
+  }
+
+  if (keywordInput.disabled) {
+    // 読み込み中／読み込み失敗時の表示はprefSelectのchangeハンドラ側で設定済み
+    return;
+  }
+
+  const results = search(keywordInput.value);
+
+  if (results === null) {
+    resultCountEl.textContent = "";
+    resultsEl.innerHTML = `<li class="empty">キーワードを入力すると候補が表示されます（${currentAddresses.length.toLocaleString()}件から検索）</li>`;
+    return;
+  }
+
+  resultCountEl.textContent = `${results.length} 件ヒット`;
+
+  if (results.length === 0) {
+    resultsEl.innerHTML = `<li class="empty">該当する住所が見つかりません</li>`;
+    return;
+  }
+
+  results.slice(0, MAX_RESULTS).forEach(({ addr, hits }) => {
+    const li = document.createElement("li");
+    li.className = "result";
+    const fullYomi = addr.yomiPref + addr.parts.map(p => p.yomi).join("");
+    li.innerHTML = `
+      <div class="addr-line">${renderAddressLine(addr, hits)}</div>
+      <div class="yomi-line">${fullYomi}</div>
+      <div class="zip-line">${renderZip(addr)}</div>
+      ${renderBadges(addr, hits)}
+    `;
+    resultsEl.appendChild(li);
+  });
+
+  if (results.length > MAX_RESULTS) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = `ほか ${results.length - MAX_RESULTS} 件あります（キーワードを追加すると絞り込めます）`;
+    resultsEl.appendChild(li);
+  }
+}
+
+// ---- 郵便番号コピー -----------------------------------------------------
+// 古いブラウザ／権限制限のある環境（サンドボックス化されたiframeなど）でも
+// 動くよう execCommand によるフォールバックを用意
+function copyViaExecCommand(text) {
+  return new Promise((resolve, reject) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.top = "0";
+    textarea.style.left = "0";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (err) {
+      // ignore, handled below
+    }
+    document.body.removeChild(textarea);
+    if (ok) resolve(); else reject(new Error("execCommand copy failed"));
+  });
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    // Clipboard APIがダメでも execCommand にフォールバックする
+    return navigator.clipboard.writeText(text).catch(() => copyViaExecCommand(text));
+  }
+  return copyViaExecCommand(text);
+}
+
+resultsEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".copy-btn");
+  if (!btn) return;
+  const zip = btn.dataset.zip;
+  const original = btn.textContent;
+  copyToClipboard(zip).then(() => {
+    btn.textContent = "コピーしました";
+    btn.classList.remove("failed");
+    btn.classList.add("copied");
+  }).catch((err) => {
+    console.error("郵便番号のコピーに失敗しました:", err);
+    btn.textContent = "コピー失敗";
+    btn.classList.remove("copied");
+    btn.classList.add("failed");
+  }).finally(() => {
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove("copied", "failed");
+    }, 1500);
+  });
+});
+
+// ---- イベント ---------------------------------------------------------
+prefSelect.addEventListener("change", () => {
+  const code = prefSelect.value;
+  keywordInput.disabled = true;
+  keywordInput.value = "";
+  currentAddresses = [];
+
+  if (!code) {
+    inputHint.textContent = "先に都道府県を選択してください";
+    render();
+    return;
+  }
+
+  inputHint.textContent = "住所データを読み込み中です…";
+  resultCountEl.textContent = "";
+  resultsEl.innerHTML = `<li class="empty">読み込み中…</li>`;
+
+  const myToken = ++loadToken;
+  loadPrefData(code).then(list => {
+    if (myToken !== loadToken) return; // 読み込み中に別の都道府県へ切り替えられた場合は破棄
+    currentAddresses = list;
+    keywordInput.disabled = false;
+    inputHint.textContent = "スペース区切りで読みがなの頭文字一致を検索します";
+    render();
+    keywordInput.focus();
+  }).catch(err => {
+    if (myToken !== loadToken) return;
+    console.error("住所データの読み込みに失敗しました:", err);
+    inputHint.textContent = "住所データの読み込みに失敗しました";
+    resultsEl.innerHTML = `<li class="empty">住所データを読み込めませんでした</li>`;
+  });
+});
+
+let debounceTimer = null;
+keywordInput.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(render, 120);
+});
+
+render();
+</script>
+</body>
+</html>
