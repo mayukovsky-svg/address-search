@@ -303,7 +303,10 @@ function buildPrefOptions(filterChar) {
 
   const realOptions = Array.from(prefSelect.options).filter(o => o.value !== "");
   const stillValid = prevValue !== "" && realOptions.some(o => o.value === prevValue);
-  prefSelect.value = stillValid ? prevValue : (realOptions[0] ? realOptions[0].value : "");
+  // 絞り込み中（filterCharあり）で選択が無効になった場合のみ先頭候補へジャンプする。
+  // 絞り込みなし（初期表示・クリア時）では自動選択せず「未選択」のままにする。
+  const fallbackValue = filterChar && realOptions[0] ? realOptions[0].value : "";
+  prefSelect.value = stillValid ? prevValue : fallbackValue;
 
   if (prefSelect.value !== prevValue) {
     prefSelect.dispatchEvent(new Event("change"));
