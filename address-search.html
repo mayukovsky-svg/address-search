@@ -275,11 +275,13 @@ const resultsEl = document.getElementById("results");
 const resultCountEl = document.getElementById("resultCount");
 
 // ---- ユーティリティ -------------------------------------------------------
-// カタカナをひらがなに変換（読みがな同士の比較専用）
+// カタカナをひらがなに変換し、全角数字を半角数字に正規化する（読みがな同士の比較専用）
+// 条・丁目などの番号パーツの読みは半角数字（例:"10"）で持っているため、
+// 「１０」のように全角で入力されても一致するようにする
 function toHiragana(str) {
-  return str.replace(/[ァ-ヶ]/g, ch =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
+  return str
+    .replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
 }
 
 // 都道府県セレクトを構築（valueはJISコード = data/xx.js のファイル名）
@@ -328,15 +330,20 @@ function getTokens(raw) {
 
 // 住所1件に対して、全トークンがいずれかのパーツの「読みの先頭」にヒットするか判定
 // （視認性・速度を優先し、部分一致は行わない）
+// 1つのパーツを複数のトークンで使い回さない（例:「１０」「１０」が両方とも
+// 同じ「十条」に一致してしまい「十丁目」が無視される、という事態を避けるため）
 function matchAddress(addr, tokens) {
+  const usedIndices = new Set();
   const tokenHits = [];
   for (const token of tokens) {
     const tokenYomi = toHiragana(token);
     let partIndex = -1;
     for (let i = 0; i < addr.parts.length; i++) {
+      if (usedIndices.has(i)) continue;
       if (addr.parts[i].yomi.startsWith(tokenYomi)) { partIndex = i; break; }
     }
     if (partIndex === -1) return null; // このトークンがどこにもヒットしなければ住所全体を除外
+    usedIndices.add(partIndex);
     tokenHits.push({ token, partIndex });
   }
   return tokenHits;
@@ -353,7 +360,7 @@ function flattenPrefData(raw) {
   for (const city of raw.cities) {
     const cityPart = { kanji: city.k, yomi: city.y };
     if (city.wards) {
-      // 政令指定都市: 市パーツ＋区パーツ＋町名パーツの3段構成
+      // 政令指定都市: 市パーツ＋区パーツ＋町名パーツ（さらに条・丁目があれば分割）の構成
       for (const ward of city.wards) {
         const wardPart = { kanji: ward.k, yomi: ward.y };
         for (const town of ward.towns) {
@@ -361,7 +368,7 @@ function flattenPrefData(raw) {
             pref: raw.pref,
             yomiPref: raw.prefYomi,
             zip: town.z,
-            parts: [cityPart, wardPart, { kanji: town.k, yomi: town.y }]
+            parts: [cityPart, wardPart, ...town.p.map(sp => ({ kanji: sp.k, yomi: sp.y }))]
           });
         }
       }
@@ -371,7 +378,7 @@ function flattenPrefData(raw) {
           pref: raw.pref,
           yomiPref: raw.prefYomi,
           zip: town.z, // 郵便番号データと一致しなかった場合は null
-          parts: [cityPart, { kanji: town.k, yomi: town.y }]
+          parts: [cityPart, ...town.p.map(sp => ({ kanji: sp.k, yomi: sp.y }))]
         });
       }
     }
